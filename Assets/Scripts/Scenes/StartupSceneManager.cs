@@ -1,10 +1,11 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class StartupSceneManager : MonoBehaviour {
 	public void EnterLobbyButton() {
-		Debug.Log("Enter lobby");
+		SceneManager.LoadScene("LobbyScene");
 	}
 
 	public void OptionsButton() {
