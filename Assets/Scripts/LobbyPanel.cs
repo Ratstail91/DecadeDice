@@ -11,6 +11,6 @@ public class LobbyPanel : MonoBehaviour {
 			throw new NullReferenceException("Failed to find LobbySceneManager");
 		}
 
-		go.GetComponent<LobbySceneManager>().JoinLobby(transform.GetSiblingIndex());
+//		go.GetComponent<LobbySceneManager>().JoinLobby(transform.GetSiblingIndex());
 	}
 }

@@ -4,7 +4,7 @@ using UnityEngine;
 using Steamworks;
 using TMPro;
 
-public class LobbySceneManager : MonoBehaviour {
+public class LobbySceneManager : MonoBehaviour, ISteamMatchmakingServerListResponse { //I need a stiff drink
 	//inspector members
 	[SerializeField]
 	GameObject lobbyPanelPrefab;
@@ -13,21 +13,18 @@ public class LobbySceneManager : MonoBehaviour {
 	Transform ListContentTransform;
 
 	//internal members
-	Callback<LobbyCreated_t> lobbyCreatedCallback;
-	Callback<LobbyMatchList_t> lobbyListCallback;
-	Callback<LobbyDataUpdate_t> lobbyInfoCallback;
-	Callback<LobbyEnter_t> lobbyEnterCallback;
+	//
 
-	ulong currentLobbyId = 0;
-
+	//lifetime members
 	void OnEnable() {
-		lobbyCreatedCallback = Callback<LobbyCreated_t>.Create(OnLobbyCreated);
-		lobbyListCallback = Callback<LobbyMatchList_t>.Create(OnGetLobbiesList);
-		lobbyInfoCallback = Callback<LobbyDataUpdate_t>.Create(OnGetLobbyInfo);
-		lobbyEnterCallback = Callback<LobbyEnter_t>.Create(OnLobbyEntered);
+		//
 
 		//kick it off
-		SearchForLobbies();
+		SearchForServers();
+	}
+
+	void OnDisable() {
+		CleanUp();
 	}
 
 	void Update() {
@@ -36,72 +33,47 @@ public class LobbySceneManager : MonoBehaviour {
 	}
 
 	//public members
-	public void SearchForLobbies() {
+	public void SearchForServers() {
 		//Instantiate(lobbyPanelPrefab, ListContentTransform);
 
-		SteamMatchmaking.RequestLobbyList();
+		Debug.Log("Searching for servers");
+
+//		MatchMakingKeyValuePair_t[] filters = new MatchMakingKeyValuePair_t[1];
+//		filters[0].m_szKey = "secure";
+
+		HServerListRequest serverListRequest = SteamMatchmakingServers.RequestLANServerList(SteamUtils.GetAppID(), this); //"this"... motherf*cker
+
+		if (serverListRequest == HServerListRequest.Invalid) {
+			Debug.Log("Request is invalid");
+		}
+
+		Debug.Log(serverListRequest);
+
+		int serverCount = SteamMatchmakingServers.GetServerCount(serverListRequest);
+		Debug.Log("Servers found: " + serverCount);
+
+		for(int i = 0; i < serverCount; i++) {
+			gameserveritem_t gs = SteamMatchmakingServers.GetServerDetails(serverListRequest, i);
+			Debug.Log("Server name: " + gs.GetServerName());
+		}
+
+		SteamMatchmakingServers.ReleaseRequest(serverListRequest);
 	}
 
-	public void CreateLobby() {
-		SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypeInvisible, 8); //TODO: switch to public
-	}
-
-	public void JoinLobby(int childIndex) {
-		Debug.Log($"Trying to join {SteamMatchmaking.GetLobbyData(SteamMatchmaking.GetLobbyByIndex(childIndex), "name")}");
-		SteamMatchmaking.LeaveLobby((CSteamID)currentLobbyId);
-		SteamMatchmaking.JoinLobby(SteamMatchmaking.GetLobbyByIndex(childIndex));
+	public void CleanUp() {
+		//TODO: release the request
 	}
 
 	//callbacks
-	void OnLobbyCreated(LobbyCreated_t result) {
-		//creates the new lobby and names it
-		if (result.m_eResult == EResult.k_EResultOK) {
-			Debug.Log("Lobby created!");
-		} else {
-			Debug.Log("Failed to create a lobby");
-		}
-
-		string personaName = SteamFriends.GetPersonaName();
-		SteamMatchmaking.SetLobbyData((CSteamID)result.m_ulSteamIDLobby, "name", $"{personaName}'s game");
+	void OnServerResponse(HServerListRequest hRequest, int iServer) {
+		Debug.Log("OnServerResponse called");
 	}
 
-	void OnGetLobbiesList(LobbyMatchList_t result) {
-		//deletes the existing list of lobbies and requests info on the new lobbies
-		Debug.Log("Found " + result.m_nLobbiesMatching + " lobbies!");
-
-		//delete existing children
-		foreach (Transform child in ListContentTransform) {
-			Destroy(child.gameObject);
-		}
-
-		//request new info
-		for(int i = 0; i < result.m_nLobbiesMatching; i++) {
-			SteamMatchmaking.RequestLobbyData(SteamMatchmaking.GetLobbyByIndex(i));
-		}
+	void OnServerFailedToRespond(HServerListRequest hRequest, int iServer) {
+		Debug.Log("OnServerFailedToRespond called");
 	}
 
-	void OnGetLobbyInfo(LobbyDataUpdate_t result) {
-		Debug.Log("Info received" + result.m_ulSteamIDLobby);
-
-		//save the lobby data, populate the display
-		GameObject go = Instantiate(lobbyPanelPrefab, ListContentTransform);
-
-		//populate the contents of the game object (TODO: have a lobby-specific script ready)
-		go.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = SteamMatchmaking.GetLobbyData((CSteamID)result.m_ulSteamIDLobby, "name");
-//		go.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = SteamMatchmaking.GetLobbyData((CSteamID)result.m_ulSteamIDLobby, "population");
-	}
-
-	void OnLobbyEntered(LobbyEnter_t result) {
-		if (result.m_EChatRoomEnterResponse == 1) {
-			currentLobbyId = result.m_ulSteamIDLobby;
-
-			Debug.Log("Current lobby: " + currentLobbyId);
-
-			Debug.Log("Joined a lobby!");
-
-			//TODO: switch scenes to the chat system
-		} else {
-			Debug.Log("Failed to join a lobby");
-		}
+	void OnRefreshComplete(HServerListRequest hRequest, EMatchMakingServerResponse response) {
+		Debug.Log("OnRefreshComplete called");
 	}
 }
